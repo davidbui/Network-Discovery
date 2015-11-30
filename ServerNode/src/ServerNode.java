@@ -36,7 +36,7 @@ public class ServerNode implements Runnable
       socket = new DatagramSocket(8888, InetAddress.getByName("0.0.0.0"));
       socket.setBroadcast(true);
       InetAddress centralServer = null;
-
+      int centralServerPort = 0;
       while (true) 
       {
         System.out.println(getClass().getName() + ">> Ready to receive broadcast packets!");
@@ -49,8 +49,8 @@ public class ServerNode implements Runnable
         // Packet received.
         System.out.println(getClass().getName() + ">> Discovery packet received from: " 
                             + packet.getAddress().getHostAddress());
-        System.out.println(getClass().getName() + ">> Packet received; data: " 
-                            + new String(packet.getData()));
+        //System.out.println(getClass().getName() + ">> Packet received; data: " 
+        //                    + new String(packet.getData()));
 
         // See if the packet holds the right command (message).
         String message = new String(packet.getData()).trim();
@@ -69,8 +69,11 @@ public class ServerNode implements Runnable
         // Central server requesting to discover all nodes on the network.
         else if (message.equals("CS_DISCOVER_REQUEST"))
         {
+          System.out.println("Central Discover Request");
+
           // Save central server data
           centralServer = packet.getAddress();
+          centralServerPort = packet.getPort();
 
           byte[] sendData = "CS_DISCOVER_RESPONSE".getBytes();
 
@@ -101,7 +104,7 @@ public class ServerNode implements Runnable
           List<Pair<InetAddress,Long>> responseList = new ArrayList<Pair<InetAddress,Long>>();
 
           // Add own IP address first to indicate to CS which response time list this is coming from.
-          Pair<InetAddress,Long> localIP = new Pair<InetAddress,Long>(myIP, (long) 0);
+          Pair<InetAddress,Long> localIP = new Pair<InetAddress,Long>(myIP, (long) -1);
           responseList.add(localIP);
 
           System.out.println("Obtaining response times..");
@@ -152,21 +155,26 @@ public class ServerNode implements Runnable
 
           if (centralServer != null)
           {
+            System.out.println("Central Server = " + centralServer.getHostAddress());
+
             // Send back results to central server.
             ByteArrayOutputStream out = new ByteArrayOutputStream();
             ObjectOutputStream outputStream = new ObjectOutputStream(out);
-            outputStream.writeObject(nodes);
+            outputStream.writeObject(responseList);
             outputStream.close();
+            
             byte[] responseTimeList = out.toByteArray();
-            SendMessage(socket, responseTimeList, centralServer, 8888);
+
+            System.out.println("Sending responseTimeList to central server.");
+            SendMessage(socket, responseTimeList, centralServer, centralServerPort);
           }
 
         }
           
       }
     } catch (IOException ex) {
-        Logger.getLogger(ServerNode.class.getName()).log(Level.SEVERE, null, ex);
-      } catch (ClassNotFoundException e) {
+      Logger.getLogger(ServerNode.class.getName()).log(Level.SEVERE, null, ex);
+    } catch (ClassNotFoundException e) {
       // TODO Auto-generated catch block
       e.printStackTrace();
     }
@@ -186,6 +194,7 @@ public class ServerNode implements Runnable
       DatagramPacket dataPacket = new DatagramPacket(sendData, sendData.length, ip, port);
       socket.send(dataPacket);
     } catch (Exception e) {
+      System.out.println("Woow");
     }
   }
 
